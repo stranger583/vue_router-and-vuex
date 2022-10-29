@@ -90,7 +90,6 @@
             },
             computed:{
                 content(){
-                    console.log(this.$router.params);
                     return this.$store.state.contents.find((item) => {
                         return item.id == this.$route.params.id
                     })
@@ -100,8 +99,10 @@
                 updateHandler(){
                     this.$store.dispatch('CONTENT_UPDATE',{
                         id:this.content.id,
-                        input:this.content.input,
-                    })
+                        input:this.input,
+                    }).then(() => {
+                            this.$router.push({ path: "/" });
+                        });
                 }
             },
             mounted(){
@@ -112,7 +113,7 @@
             
         }
         let store = new Vuex.Store({
-            strict:true,
+            // strict:true,
             state:{
                 contents:[],
             },
@@ -150,16 +151,15 @@
                  },
                  CONTENT_UPDATE: (context, { id, input }) => {
                     console.log("UPDATE");
-                    let item =context.state.contents.find((item)=>{
-                        return item.id = id
+                    let item = context.state.contents.find((item)=>{
+                        return item.id == id;
                     })
-                    if(!item) return false
+                    if(!item) return false;
                     return axios
-                        .patch("http://localhost:3000/contents/" + item.id,{
-                            content:input,
-                        })
+                    .patch("http://localhost:3000/contents/" + item.id, { content: input })
                         .then(res => {
                         context.commit("updateContent", {item,input});
+                        console.log("UPDATE2");
                         });
                  },
             }
