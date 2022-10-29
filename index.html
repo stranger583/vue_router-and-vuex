@@ -1,0 +1,198 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta http-equiv="X-UA-Compatible" content="IE=edge">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <link rel="stylesheet" href="style.css">
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vue/2.5.16/vue.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vue-router/3.0.1/vue-router.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/vuex/3.0.1/vuex.js'></script>
+    <script src='https://cdnjs.cloudflare.com/ajax/libs/axios/0.18.0/axios.js'></script>    
+    <title>vuex & router 練習</title>
+</head>
+<body>
+    <!-- json-server data.json -->
+    <div id="app">
+       
+        <router-view></router-view>
+    </div>
+
+    <script>
+        let List = {
+            template:` <div><p>
+            <input type="text" v-model.trim="input">
+            <a href="javascript:;" @click="createHandler">CREATE</a>
+        </p>
+        <ol>
+            <li v-for="(content,index) in contents">
+                {{content.content}}
+                <a href="javascript:;" @click="updateHandler(index)">UPDATE</a>
+                <a href="javascript:;" @click="deleteHandler(index)">DELETE</a>
+
+            </li>
+        </ol></div>`,
+        data(){
+            return{
+                //因為component會重複使用，要用傳值的方式
+                // contents:[],
+                input:"",
+            }
+            },
+        computed:{
+            contents(){
+                //暫存state
+                return this.$store.state.contents
+            }
+        },
+        methods:{
+                createHandler(){
+                    if(!this.input) return false
+                    // 流程 component給 後端api 直接commit給mutation 給state渲染畫面
+                    axios.post('http://localhost:3000/contents',{
+                        content:this.input,
+                    }).then((res)=>{
+                        this.input = "";
+                        // this.contents.push(res.data) 要用actions送
+                        this.$store.commit("addContent",res.data)
+                    })
+                },
+                updateHandler(index){
+                    let target = this.contents[index]
+                    // this.$router.push({path:`/update/"${target.id}`})//es6寫法 可上頁
+                    this.$router.push({name:'update',params:{id:target.id}})
+                    console.log(target.id);
+                    // $router.replace({path:"/update" + target.id})
+                },
+                deleteHandler(index) {
+                    let target = this.contents[index];
+                    // axios.delete(`http://localhost:3000/contents/${target.id}`).then((res) => {
+                    //   this.contents.splice(index, 1)
+                    // })
+                    this.$store.dispatch("CONTENT_DELETE", { target });
+                    },
+                    
+            },
+            mounted(){
+                // axios.get('http://localhost:3000/contents')
+                // .then((res)=>{
+                //     this.contents = res.data;
+                // })
+            },
+        }
+        let Edit = {
+            template:`<div><input type="text" v-model.trim="input">
+                        <a href="javascript:;" @click=updateHandler>更新</a ></div>`,
+            data(){
+                return {
+                    input:""
+                }
+            },
+            computed:{
+                content(){
+                    console.log(this.$router.params);
+                    return this.$store.state.contents.find((item) => {
+                        return item.id == this.$route.params.id
+                    })
+                }
+            },
+            methods:{
+                updateHandler(){
+                    this.$store.dispatch('CONTENT_UPDATE',{
+                        id:this.content.id,
+                        input:this.content.input,
+                    })
+                }
+            },
+            mounted(){
+                if(!this.content) return this.$router.replace({path:"/"})
+                this.input = this.content.content
+                
+            },
+            
+        }
+        let store = new Vuex.Store({
+            strict:true,
+            state:{
+                contents:[],
+            },
+            mutations:{
+                setContents(state,data){
+                    state.contents = data
+                },
+                addContent(state,data){
+                    state.contents.push(data)
+                },
+                deleteContent(state, data) {
+                state.contents.splice(data, 1);
+                },
+                updateContent(state, {item, input}) {
+                item.content = input
+                },
+            },
+            actions:{
+                //類似於打事件 promise物件可return回去
+                //vue 到 actions 到 api 取得data 給mutations data 給state 影響vue畫面 
+                CONTENTS_READ:(context)=>{
+                    return axios.get('http://localhost:3000/contents').then((res)=>{
+                        context.commit("setContents",res.data)
+                    })
+                },
+                CONTENT_DELETE: (context, { target }) => {
+                    console.log("DELETE");
+                    let index = context.state.contents.indexOf(target);
+                    if (index == -1) return false;
+                    return axios
+                        .delete("http://localhost:3000/contents/" + target.id)
+                        .then(res => {
+                        context.commit("deleteContent", index);
+                        });
+                 },
+                 CONTENT_UPDATE: (context, { id, input }) => {
+                    console.log("UPDATE");
+                    let item =context.state.contents.find((item)=>{
+                        return item.id = id
+                    })
+                    if(!item) return false
+                    return axios
+                        .patch("http://localhost:3000/contents/" + item.id,{
+                            content:input,
+                        })
+                        .then(res => {
+                        context.commit("updateContent", {item,input});
+                        });
+                 },
+            }
+        })
+        let router = new VueRouter({
+            routes:[
+                {
+                    path: "/",
+                    name:'list',//名稱
+                    component:List,
+                },
+                {
+                    path: "/update/:id",
+                    name:"update",
+                    component:Edit,
+                },
+                {
+                    path: "*",//網址
+                    redirect:"/"//導頁
+                }
+            ]
+        })
+
+        new Vue({
+            el:"#app",
+            router,
+            store,
+            mounted(){
+                //可接then() actions需要有return值  action方法 commit=>送mutatiom dispatch=>再送非同步 getters=>讀資料回來 state=>讀資料回來 rootState讀更外層資料
+                this.$store.dispatch('CONTENTS_READ')
+            }
+            
+        })
+    </script>
+</body>
+</html>

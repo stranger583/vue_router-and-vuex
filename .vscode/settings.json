@@ -1,0 +1,10 @@
+{
+    "liveSassCompile.settings.rootIsWorkspace": null,
+    "liveServer.settings.ignoreFiles": [
+        ".vscode/**",
+        "**/*.scss",
+        "**/*.sass",
+        "**/*.ts",
+        "**/*.json",
+    ]
+}
